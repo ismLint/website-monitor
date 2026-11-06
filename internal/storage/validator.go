@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -10,20 +10,20 @@ func ValidateURL(rawURL string) error {
 	rawURL = strings.TrimSpace(rawURL)
 
 	if rawURL == "" {
-		return errors.New("URL cannot be empty")
+		return fmt.Errorf("%w: URL cannot be empty", ErrInvalidURL)
 	}
 
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
-		return errors.New("Error parse URL")
+		return fmt.Errorf("%w: Failed to parse URL: %v", ErrInvalidURL, err)
 	}
 
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
-		return errors.New("Can't use such things site")
+		return fmt.Errorf("%w: Can't use such things site", ErrInvalidURL)
 	}
 
 	if parsedURL.Host == "" {
-		return errors.New("URL host cannot be empty")
+		return fmt.Errorf("%w: URL host cannot be empty", ErrInvalidURL)
 	}
 
 	return nil

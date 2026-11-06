@@ -2,11 +2,13 @@ package storage
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"time"
 )
 
 var ErrSiteNotFound = errors.New("site not found")
+var ErrInvalidURL = errors.New("ivalid URL")
 
 type Site struct {
 	ID           int
@@ -41,20 +43,22 @@ func (s *Storage) GetAll() []Site {
 	return sites
 }
 
-func (s *Storage) Add(site Site) error {
+func (s *Storage) Add(site Site) (Site, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	err := ValidateURL(site.URL)
 	if err != nil {
-		return err
+		return Site{}, err
 	}
+
+	site.URL = strings.TrimSpace(site.URL)
 
 	s.nextID++
 	site.ID = s.nextID
 	s.Sites[site.ID] = site
 
-	return nil
+	return site, nil
 }
 
 func (s *Storage) GetByID(id int) (Site, error) {

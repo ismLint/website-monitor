@@ -12,6 +12,10 @@ type Handler struct {
 	storage *storage.Storage
 }
 
+var request struct {
+	URL string `json:"url"`
+}
+
 func NewHandler(s *storage.Storage) *Handler {
 	return &Handler{
 		storage: s,
@@ -54,4 +58,37 @@ func (h *Handler) GetSites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (h *Handler) PostSites(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 mib
+	defer r.Body.Close()
+
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			http.Error(w, "Request too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	site, err := h.storage.Add(storage.Site{URL: request.URL})
+	if errors.Is(err, storage.ErrInvalidURL) {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err = json.NewEncoder(w).Encode(site); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }

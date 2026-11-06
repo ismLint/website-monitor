@@ -24,6 +24,7 @@ func main() {
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("GET /sites", h.GetAllSites)
 	mux.HandleFunc("GET /sites/{id}", h.GetSites)
+	mux.HandleFunc("POST /sites", h.PostSites)
 
 	store.Add(storage.Site{URL: "https://example.com"})
 

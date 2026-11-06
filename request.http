@@ -1,4 +1,12 @@
 ###health
 #GET http://localhost:8080/health
 
-GET http://localhost:8080/sites/1
+#GET http://localhost:8080/sites/1
+
+
+POST http://localhost:8080/sites
+Content-Type: application/json
+
+{
+    "url": "ftp://example.com"
+} 
