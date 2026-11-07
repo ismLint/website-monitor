@@ -92,3 +92,47 @@ func (h *Handler) PostSites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func (h *Handler) PatchSites(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&request)
+	defer r.Body.Close()
+
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			http.Error(w, "Request too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	site, err := h.storage.Update(id, request.URL)
+	if errors.Is(err, storage.ErrInvalidURL) {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, storage.ErrSiteNotFound) {
+		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(site); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}

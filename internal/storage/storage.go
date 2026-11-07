@@ -85,20 +85,25 @@ func (s *Storage) Delete(id int) error {
 	return nil
 }
 
-func (s *Storage) Update(id int, newURL string) error {
+func (s *Storage) Update(id int, newURL string) (Site, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	site, exists := s.Sites[id]
 	if !exists {
-		return ErrSiteNotFound
+		return Site{}, ErrSiteNotFound
 	}
 
+	newURL = strings.TrimSpace(newURL)
 	if err := ValidateURL(newURL); err != nil {
-		return err
+		return Site{}, err
 	}
 
 	site.URL = newURL
+	site.Availability = false
+	site.LastCheck = time.Time{}
+	site.ResponseTime = 0
+
 	s.Sites[id] = site
-	return nil
+	return site, nil
 }
