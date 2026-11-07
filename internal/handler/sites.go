@@ -22,6 +22,11 @@ func NewHandler(s *storage.Storage) *Handler {
 	}
 }
 
+type Server struct {
+	Status  string `json:"status"`
+	Service string `json:"service"`
+}
+
 func (h *Handler) GetAllSites(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	sites := h.storage.GetAll()
@@ -156,4 +161,17 @@ func (h *Handler) DeleteSite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func HealthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	response := Server{
+		Status:  "ok",
+		Service: "website-monitor",
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
