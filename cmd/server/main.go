@@ -26,6 +26,7 @@ func main() {
 	mux.HandleFunc("GET /sites/{id}", h.GetSites)
 	mux.HandleFunc("POST /sites", h.PostSites)
 	mux.HandleFunc("PATCH /sites/{id}", h.PatchSites)
+	mux.HandleFunc("DELETE /sites/{id}", h.DeleteSite)
 
 	store.Add(storage.Site{URL: "https://example.com"})
 
