@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -92,5 +93,112 @@ func TestGetSitesEndpoint(t *testing.T) {
 		if !found {
 			t.Fatalf("Expected site %s to be returned", url)
 		}
+	}
+}
+
+func TestGetSiteByIDEndpoint(t *testing.T) {
+	store := storage.NewStorage()
+	router := app.NewRouter(store)
+
+	var site storage.Site
+
+	createdSite1, err := store.Add(storage.Site{URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("Failed to add site: %v", err)
+	}
+
+	if _, err := store.Add(storage.Site{URL: "https://google.com"}); err != nil {
+		t.Fatalf("Failed to add site: %v", err)
+	}
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	req := fmt.Sprintf("%s/sites/%d", server.URL, createdSite1.ID)
+	resp, err := http.Get(req)
+	if err != nil {
+		t.Fatalf("Request failed: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 status code, got %d", resp.StatusCode)
+	}
+
+	if err = json.NewDecoder(resp.Body).Decode(&site); err != nil {
+		t.Fatalf("Parse JSON failed: %v", err)
+	}
+
+	if createdSite1.URL != site.URL {
+		t.Fatalf("Expected %s url, got %v ", createdSite1.URL, site.URL)
+	}
+
+	if createdSite1.ID != site.ID {
+		t.Fatalf("Expected %d id, got %d", createdSite1.ID, site.ID)
+	}
+}
+
+func TestGetByIDEndpointTable(t *testing.T) {
+	store := storage.NewStorage()
+	router := app.NewRouter(store)
+	var site storage.Site
+
+	createdSite, err := store.Add(storage.Site{URL: "http://example.com"})
+	if err != nil {
+		t.Fatalf("Failed to add site: %v", err)
+	}
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	tests := []struct {
+		name           string
+		id             string
+		expectedStatus int
+		expectedID     int
+	}{
+		{
+			name:           "Site Not Found",
+			id:             "999",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "Invalid ID",
+			id:             "qwe",
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "Valid ID",
+			id:             "1",
+			expectedStatus: http.StatusOK,
+			expectedID:     createdSite.ID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := fmt.Sprintf("%s/sites/%s", server.URL, tt.id)
+			resp, err := http.Get(req)
+			if err != nil {
+				t.Fatalf("Request failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != tt.expectedStatus {
+				t.Fatalf("Expected %d status code, got %d. Test name: %s",
+					tt.expectedStatus, resp.StatusCode, tt.name)
+			}
+
+			if resp.StatusCode == http.StatusOK {
+				if err = json.NewDecoder(resp.Body).Decode(&site); err != nil {
+					t.Fatalf("Failed to decode JSON: %v", err)
+				}
+
+				if tt.expectedID != site.ID {
+					t.Fatalf("Expected %d site id, got %d", tt.expectedID, site.ID)
+				}
+			}
+		})
 	}
 }
