@@ -1,2 +1,0 @@
-// сюда код
-package checker

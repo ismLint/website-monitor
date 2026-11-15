@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -202,3 +203,90 @@ func TestGetByIDEndpointTable(t *testing.T) {
 		})
 	}
 }
+
+func TestPostSitesEncpoint(t *testing.T) {
+	var createdSite storage.Site
+	requestBody := struct {
+		URL string `json:"url"`
+	}{
+		URL: "https://example.com",
+	}
+	store := storage.NewStorage()
+	router := app.NewRouter(store)
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("Failed serialize struct: %v", err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		server.URL+"/sites",
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		t.Fatalf("Request Failed: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Response send failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("Expected status %d, got %d",
+			http.StatusCreated, resp.StatusCode)
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&createdSite)
+	if err != nil {
+		t.Fatalf("Failed decode JSON: %v", err)
+	}
+
+	if createdSite.ID < 1 {
+		t.Fatal("Site ID < 1")
+	}
+
+	if requestBody.URL != createdSite.URL {
+		t.Fatalf("Expected url %s, got %s",
+			req.URL.String(), createdSite.URL)
+	}
+}
+
+// func TestPatchSitesEndpoint(t *testing.T) {
+// 	requestBody := struct {
+// 		URL string `json:"url"`
+// 		ID  int    `json:"id"`
+// 	}{
+// 		ID:  1,
+// 		URL: "https://google.com",
+// 	}
+// 	store := storage.NewStorage()
+// 	router := app.NewRouter(store)
+
+// 	server := httptest.NewServer(router)
+// 	defer server.Close()
+
+// 	createdSite, err := store.Add(storage.Site{URL: "https://example.com"})
+// 	if err != nil {
+// 		t.Fatalf("Failed add site: %v", err)
+// 	}
+
+// 	jsonData, err := json.Marshal(requestBody)
+// 	if err != nil {
+// 		t.Fatalf("Failed serialize struct: %v", err)
+// 	}
+
+// 	request := fmt.Sprintf("%s/sites/%d", server.URL, requestBody.ID)
+
+// 	req, err := http.NewRequest(
+// 		http.MethodPatch,
+// 		request,
+// 		bytes.NewBuffer(jsonData),
+// 	)
+
+// }
