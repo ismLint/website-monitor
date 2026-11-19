@@ -257,36 +257,166 @@ func TestPostSitesEncpoint(t *testing.T) {
 	}
 }
 
-// func TestPatchSitesEndpoint(t *testing.T) {
-// 	requestBody := struct {
-// 		URL string `json:"url"`
-// 		ID  int    `json:"id"`
-// 	}{
-// 		ID:  1,
-// 		URL: "https://google.com",
-// 	}
-// 	store := storage.NewStorage()
-// 	router := app.NewRouter(store)
+func TestPatchSitesEndpoint(t *testing.T) {
+	var site storage.Site
 
-// 	server := httptest.NewServer(router)
-// 	defer server.Close()
+	requestBody := struct {
+		URL string `json:"url"`
+	}{
+		URL: "https://google.com",
+	}
+	store := storage.NewStorage()
+	router := app.NewRouter(store)
 
-// 	createdSite, err := store.Add(storage.Site{URL: "https://example.com"})
-// 	if err != nil {
-// 		t.Fatalf("Failed add site: %v", err)
-// 	}
+	server := httptest.NewServer(router)
+	defer server.Close()
 
-// 	jsonData, err := json.Marshal(requestBody)
-// 	if err != nil {
-// 		t.Fatalf("Failed serialize struct: %v", err)
-// 	}
+	createdSite, err := store.Add(storage.Site{URL: "https://example.com"})
+	if err != nil {
+		t.Fatalf("Failed add site: %v", err)
+	}
 
-// 	request := fmt.Sprintf("%s/sites/%d", server.URL, requestBody.ID)
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		t.Fatalf("Failed serialize struct: %v", err)
+	}
 
-// 	req, err := http.NewRequest(
-// 		http.MethodPatch,
-// 		request,
-// 		bytes.NewBuffer(jsonData),
-// 	)
+	request := fmt.Sprintf("%s/sites/%d", server.URL, createdSite.ID)
 
-// }
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		request,
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		t.Fatalf("Request failed: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Response send failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 status code, got %v", resp.StatusCode)
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&site)
+	if err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if site.ID != createdSite.ID {
+		t.Fatalf("Expected site id equals created site id")
+	}
+
+	if site.URL != requestBody.URL {
+		t.Fatalf("Expected site URL equals created site URL")
+	}
+
+	if site.Availability {
+		t.Fatalf("Expected site availability set false")
+	}
+
+	if !site.LastCheck.IsZero() {
+		t.Fatalf("Expected site last check to be empty")
+	}
+
+	if site.ResponseTime != 0 {
+		t.Fatalf("Expected site response time to be empty")
+	}
+}
+
+func TestDeleteSiteEndpoint(t *testing.T) {
+	store := storage.NewStorage()
+	router := app.NewRouter(store)
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	createdSite, err := store.Add(storage.Site{URL: "http://example.com"})
+	if err != nil {
+		t.Fatalf("Failed to add site: %v", err)
+	}
+
+	response := fmt.Sprintf("%s/sites/%d", server.URL, createdSite.ID)
+
+	req, err := http.NewRequest(
+		http.MethodDelete,
+		response,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("Request send failed: %v", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Response failed: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("Expected %d, got %d",
+			http.StatusNoContent, resp.StatusCode)
+	}
+
+	request, err := http.Get(response)
+	if err != nil {
+		t.Fatalf("Request get failed: %v", err)
+	}
+	defer request.Body.Close()
+
+	if request.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %v", request.StatusCode)
+	}
+}
+
+func TestDeleteSiteEndpointInvalidID(t *testing.T) {
+	store := storage.NewStorage()
+	router := app.NewRouter(store)
+
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	tests := []struct {
+		name           string
+		id             string
+		expectedStatus int
+	}{
+		{
+			name:           "Site Not Found",
+			id:             "999",
+			expectedStatus: http.StatusNotFound,
+		},
+		{
+			name:           "Invalid ID",
+			id:             "abc",
+			expectedStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestURL := fmt.Sprintf("%s/sites/%s", server.URL, tt.id)
+			req, err := http.NewRequest(http.MethodDelete, requestURL, nil)
+			if err != nil {
+				t.Fatalf("Request failed: %v", err)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Response failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != tt.expectedStatus {
+				t.Fatalf("Expected %d status code, got %d", tt.expectedStatus, resp.StatusCode)
+			}
+		})
+	}
+}
